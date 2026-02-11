@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: therike-rss-feed
+    runtime: node
+    plan: free
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SHOPIFY_DOMAIN
+        value: therike.com
+      - key: CACHE_TTL_MS
+        value: 300000
+      - key: NODE_ENV
+        value: production

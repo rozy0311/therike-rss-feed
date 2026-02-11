@@ -1,0 +1,16 @@
+{
+  "name": "therike-fulltext-rss",
+  "version": "1.0.0",
+  "description": "Full-text RSS 2.0 feed server for SocialBee — no content:encoded, no CDN proxy",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["rss", "shopify", "socialbee", "full-text"],
+  "license": "MIT"
+}
