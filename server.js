@@ -26,6 +26,7 @@ import { URL } from "node:url";
 const PORT = parseInt(process.env.PORT || "3456", 10);
 const SHOPIFY_DOMAIN = process.env.SHOPIFY_DOMAIN || "therike.com";
 const CACHE_TTL_MS = parseInt(process.env.CACHE_TTL_MS || "300000", 10); // 5 min default
+const MAX_DESC_LEN = parseInt(process.env.MAX_DESC_LEN || "4000", 10); // max chars per item description
 
 // ─── In-memory cache ───────────────────────────────────────────
 const cache = new Map(); // key: blogHandle → { xml, timestamp }
@@ -74,6 +75,9 @@ async function buildRSS(blogHandle) {
       // Clean up: strip any inline <style> blocks to keep feed lighter
       fullHtml = fullHtml.replace(/<style[\s\S]*?<\/style>/gi, "").trim();
 
+      // Truncate to MAX_DESC_LEN characters for SocialBee compatibility
+      fullHtml = truncateHtml(fullHtml, MAX_DESC_LEN);
+
       // RFC 822 date for RSS 2.0
       const pubDate = toRFC822(published);
 
@@ -103,6 +107,44 @@ ${items}
 </rss>`;
 
   return rss;
+}
+
+// ─── HTML truncation ───────────────────────────────────────────
+
+/**
+ * Truncate HTML to approximately `maxLen` characters of visible text.
+ * Strips all tags → truncates → returns plain text with "…" suffix.
+ * This keeps the description clean and within SocialBee limits.
+ */
+function truncateHtml(html, maxLen) {
+  if (!html) return "";
+
+  // Strip all HTML tags to get plain text
+  let text = html
+    .replace(/<br\s*\/?>/gi, "\n")           // preserve line breaks
+    .replace(/<\/p>/gi, "\n\n")              // paragraph breaks
+    .replace(/<\/h[1-6]>/gi, "\n\n")         // heading breaks
+    .replace(/<\/li>/gi, "\n")               // list item breaks
+    .replace(/<[^>]*>/g, "")                 // strip remaining tags
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\n{3,}/g, "\n\n")             // collapse excessive newlines
+    .trim();
+
+  if (text.length <= maxLen) return text;
+
+  // Cut at maxLen, then back up to last space to avoid mid-word cut
+  let truncated = text.substring(0, maxLen);
+  const lastSpace = truncated.lastIndexOf(" ");
+  if (lastSpace > maxLen * 0.8) {
+    truncated = truncated.substring(0, lastSpace);
+  }
+
+  return truncated.trimEnd() + "…";
 }
 
 // ─── XML helpers (no dependencies) ─────────────────────────────
@@ -228,6 +270,7 @@ const server = http.createServer(async (req, res) => {
   <pre>
 SHOPIFY_DOMAIN = ${SHOPIFY_DOMAIN}
 CACHE_TTL      = ${CACHE_TTL_MS / 1000}s
+MAX_DESC_LEN   = ${MAX_DESC_LEN} chars
 PORT           = ${PORT}
   </pre>
 </body></html>`);
@@ -243,6 +286,7 @@ server.listen(PORT, () => {
   console.log(`   Domain:  ${SHOPIFY_DOMAIN}`);
   console.log(`   Port:    ${PORT}`);
   console.log(`   Cache:   ${CACHE_TTL_MS / 1000}s`);
+  console.log(`   MaxDesc: ${MAX_DESC_LEN} chars`);
   console.log(`\n   Feed URL: http://localhost:${PORT}/rss/sustainable-living`);
   console.log(`   Health:   http://localhost:${PORT}/health\n`);
 });
